@@ -11,6 +11,11 @@ This repository contains the `azaksremotedeployment.sh` script, which simplifies
 
 Run the script to create a new Remote Desktop environment accessible only from your current public IP.
 
+### Bash
+```
+az login --use-device-code && git clone https://github.com/crtvrffnrt/azaksremotedeployment.git && chmod +x ./azaksremotedeployment && ./azaksremotedeployment/azaksremotedeployment.sh -r "$yourPublicip/32"
+```
+
 **Alternative from Azure Portal**
 
 1. Login to Azure
