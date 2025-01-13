@@ -4,7 +4,8 @@ This repository contains the `azaksremotedeployment.sh` script, which simplifies
 
 **Description**
 
-* The script requires specifying Allowed IP ranges using the `-r` flag.
+* The script requires specifying Allowed IP ranges for api management using the `-r` flag.
+* All IP`s can access Web-Url
 * It automatically deletes old resource groups created by the script to maintain a clean Azure environment.
 
 **How to Use**
@@ -27,11 +28,12 @@ az login --use-device-code && git clone https://github.com/crtvrffnrt/azaksremot
 
 **Specify Additional IP Ranges**
 
-You can allow access for both your current public IP and an additional range using the `-r` flag:
+You can allow access for API ACCESS of Azure AKS with your current public IP and an additional range using the `-r` flag:
 
 ```bash
 ./azaksremotedeployment.sh -r "198.51.100.10/32"
 ```
+
 ## Clean up
 Old resource groups created by this script are automatically deleted to keep your Azure environment organized. If you wish to disable this behavior, modify the script accordingly.
 
