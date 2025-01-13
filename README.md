@@ -17,6 +17,9 @@ Run the script to create a new Remote Desktop environment accessible only from y
 az login --use-device-code && git clone https://github.com/crtvrffnrt/azaksremotedeployment.git && chmod +x ./azaksremotedeployment/azaksremotedeployment.sh && bash azaksremotedeployment/azaksremotedeployment.sh -r "$yourPublicip/32"
 ```
 
+
+![image](https://github.com/user-attachments/assets/4baa42ca-a07f-4804-a05a-e8f9820917c2)
+
 **Alternative from Azure Portal**
 
 1. Login to Azure
