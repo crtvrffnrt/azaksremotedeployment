@@ -33,6 +33,14 @@ You can allow access for API ACCESS of Azure AKS with your current public IP and
 ```bash
 ./azaksremotedeployment.sh -r "198.51.100.10/32"
 ```
+**active password protection**
+If set to true password is required to access Remote Destkop.
+
+
+```bash
+./azaksremotedeployment.sh -r "198.51.100.10/32" -p true
+```
+
 
 ## Clean up
 Old resource groups created by this script are automatically deleted to keep your Azure environment organized. If you wish to disable this behavior, modify the script accordingly.
