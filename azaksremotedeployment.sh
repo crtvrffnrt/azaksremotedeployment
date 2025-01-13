@@ -59,7 +59,11 @@ deploy_docker_in_aks() {
     local location="eastus"
     local node_count=1
     local dns_name="tiny-remote-desktop-$RANDOM"
-    local vnc_password=$(generate_random_password)
+    local vnc_password=""
+
+    if [[ "$PASSWORD_REQUIRED" == true ]]; then
+        vnc_password=$(generate_random_password)
+    fi
 
     display_message "Creating Azure Kubernetes Service cluster..." "blue"
 
@@ -105,11 +109,25 @@ spec:
         image: soff/tiny-remote-desktop
         ports:
         - containerPort: 6901
+EOF
+
+    if [[ "$PASSWORD_REQUIRED" == true ]]; then
+        cat <<EOF >> tiny-remote-desktop-deployment.yaml
         env:
         - name: VNC_PASSWORD
           value: "$vnc_password"
         - name: RESOLUTION
           value: "1920x1080"
+EOF
+    else
+        cat <<EOF >> tiny-remote-desktop-deployment.yaml
+        env:
+        - name: RESOLUTION
+          value: "1920x1080"
+EOF
+    fi
+
+    cat <<EOF >> tiny-remote-desktop-deployment.yaml
 ---
 apiVersion: v1
 kind: Service
@@ -142,10 +160,18 @@ EOF
     display_message "RDP container deployed successfully." "green"
     display_message "Access the RDP environment at: http://$external_ip:6901" "cyan"
 
-    # Display connection details
-    display_message "Connection details:" "magenta"
-    echo "VNC Password: $vnc_password"
-    echo "Public IP: $external_ip"
+    if [[ "$PASSWORD_REQUIRED" == true ]]; then
+        # Display connection details with password
+        display_message "Auto-generated connection details:" "magenta"
+        echo "URL: http://$external_ip:6901"
+        echo "VNC Password: $vnc_password"
+
+        # Provide login command directly
+        display_message "Use the following command to connect without needing a browser:" "blue"
+        echo "vncviewer $external_ip:6901"
+    else
+        display_message "No password required to connect. Access the RDP environment directly at the provided URL." "blue"
+    fi
 }
 
 # Main script execution
@@ -154,16 +180,18 @@ main() {
 
     local RESOURCE_GROUP="MFA-Bypass-Docker-RG$RANDOM"
     local LOCATION="eastus"
+    PASSWORD_REQUIRED=false
 
-    while getopts "r:" opt; do
+    while getopts "r:p:" opt; do
         case $opt in
             r) ALLOWED_IP="$OPTARG" ;;
+            p) PASSWORD_REQUIRED=true ;;
             *) display_message "Invalid option." "red"; exit 1 ;;
         esac
     done
 
     if [[ -z "$ALLOWED_IP" ]]; then
-        display_message "Usage: $0 -r <allowed_ip_cidr>" "red"
+        display_message "Usage: $0 -r <allowed_ip_cidr> [-p true]" "red"
         exit 1
     fi
 
@@ -182,7 +210,7 @@ main() {
     # Deploy Docker container in AKS
     deploy_docker_in_aks "$RESOURCE_GROUP"
 
-    display_message "Setup complete. Use the URL provided to access the RDP environment." "green"
+    display_message "Setup complete. Use the provided details to connect to the RDP environment." "green"
 }
 
 main "$@"
